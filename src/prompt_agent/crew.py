@@ -15,8 +15,6 @@ class PromptAgent:
     tasks_config = 'config/tasks.yaml'
 
     def __init__(self):
-        # Use CrewAI's native LLM wrapper (LiteLLM under the hood).
-        # This prevents CrewAI from defaulting to the OpenAI provider.
         self.groq_llm = LLM(
             model="groq/llama-3.1-8b-instant",
             api_key=os.getenv("GROQ_API_KEY"),
@@ -55,9 +53,9 @@ class PromptAgent:
     def crew(self) -> Crew:
         """Creates the PromptAgent crew"""
         return Crew(
-            agents=self.agents, # Automatically created by the @agent decorator
-            tasks=self.tasks, # Automatically created by the @task decorator
+            agents=self.agents,
+            tasks=self.tasks,
             process=Process.sequential,
             verbose=True,
-            # process=Process.hierarchical, # In case you want to use that instead https://docs.crewai.com/how-to/Hierarchical/
+           
         )
