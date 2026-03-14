@@ -1,0 +1,16 @@
+#two agents
+research_task:
+  description: >
+    Conduct a thorough research on the latest advancements in AI.
+    Identify key trends, breakthroughs, and significant research papers.
+  expected_output: >
+    A list of 10 bullet points summarizing the most relevant information about recent AI advancements.
+  agent: researcher
+
+reporting_task:
+  description: >
+    Review the research findings and expand each point into a full section for a comprehensive report.
+    Ensure the report is detailed, well-structured, and provides insightful analysis.
+  expected_output: >
+    A fully fledged report in markdown format, with a title, introduction, and detailed sections for each key finding.
+  agent: reporting_analyst
