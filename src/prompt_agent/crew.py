@@ -3,8 +3,6 @@ from crewai.project import CrewBase, agent, crew, task
 import os
 from dotenv import load_dotenv
 
-from prompt_agent.tools.custom_tool import BraveSearchTool
-
 load_dotenv()
 
 @CrewBase
@@ -24,7 +22,6 @@ class PromptAgent:
     def researcher(self) -> Agent:
         return Agent(
             config=self.agents_config['researcher'],
-            tools=[BraveSearchTool()],
             verbose=True,
             llm=self.groq_llm
         )
@@ -33,6 +30,22 @@ class PromptAgent:
     def reporting_analyst(self) -> Agent:
         return Agent(
             config=self.agents_config['reporting_analyst'],
+            verbose=True,
+            llm=self.groq_llm
+        )
+
+    @agent
+    def requirement_interviewer(self) -> Agent:
+        return Agent(
+            config=self.agents_config['requirement_interviewer'],
+            verbose=True,
+            llm=self.groq_llm
+        )
+
+    @agent
+    def context_analyzer(self) -> Agent:
+        return Agent(
+            config=self.agents_config['context_analyzer'],
             verbose=True,
             llm=self.groq_llm
         )
@@ -47,6 +60,18 @@ class PromptAgent:
     def reporting_task(self) -> Task:
         return Task(
             config=self.tasks_config['reporting_task'],
+        )
+
+    @task
+    def requirement_interview_task(self) -> Task:
+        return Task(
+            config=self.tasks_config['requirement_interview_task'],
+        )
+
+    @task
+    def context_analysis_task(self) -> Task:
+        return Task(
+            config=self.tasks_config['context_analysis_task'],
         )
 
     @crew
