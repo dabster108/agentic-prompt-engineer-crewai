@@ -23,3 +23,29 @@ reporting_task:
     and well-structured sections elaborating each of the identified AI advancements.
 
   agent: reporting_analyst
+
+requirement_interview_task:
+  description: >
+    Analyze the user's intent and convert it into a complete requirement specification
+    for prompt engineering. The specification must include objective, audience,
+    tone/style preference, constraints, expected output format, success criteria,
+    and any missing information assumptions.
+
+  expected_output: >
+    A markdown section titled requirements_spec with clear headings: objective,
+    audience, tone_style, constraints, output_format, success_criteria,
+    and missing_information_assumptions.
+
+  agent: requirement_interviewer
+
+context_analysis_task:
+  description: >
+    Using the requirement specification from the previous task, produce a compact
+    context brief that will guide prompt construction. Identify key domain details,
+    risks, dependencies, edge cases, and operational assumptions.
+
+  expected_output: >
+    A markdown section titled context_brief with headings: domain_context,
+    key_constraints, dependencies, edge_cases, risk_notes, and assumptions.
+
+  agent: context_analyzer

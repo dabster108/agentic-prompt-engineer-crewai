@@ -1,63 +1,153 @@
-# Project Knowledge Base
+# PromptForge Knowledge Base
 
-This document provides a detailed overview of the PromptAgent Crew project, including its structure, components, and configuration.
+This document defines what PromptForge is intended to become, how the multi-agent architecture should work, and how the current code maps to that target.
 
-## Project Overview
+## Product Intention
 
-The PromptAgent Crew is a multi-agent AI system built using the [crewAI](https://crewai.com) framework. It's designed to automate complex tasks by enabling a team of AI agents to collaborate effectively.
+PromptForge is intended to be an agentic prompt engineering studio.
 
-## Core Components
+The end goal is to take a rough user idea and produce a production-ready prompt package that includes:
 
-The project is structured into several key files and directories:
+- A high-quality final prompt
+- Assumptions and constraints
+- Suggested model/settings
+- Validation checklist
+- Optional prompt variants (strict, creative, concise)
 
-### 1. `main.py`
+## Current State vs Target
 
-This is the main entry point for running the crew. It handles:
+Current implementation is an early foundation:
 
-- Setting up the initial inputs for the crew (e.g., `topic`, `current_year`).
-- Kicking off the crew's execution.
-- Providing functions for training, replaying, and testing the crew.
+- 2 agents: `researcher` and `reporting_analyst`
+- 2 tasks: `research_task` and `reporting_task`
+- Sequential flow using CrewAI
 
-### 2. `crew.py`
+Target implementation is a full prompt-engineering pipeline with specialized agents and explicit artifacts at each stage.
 
-This file defines the crew's structure, including the agents and tasks.
+## Target Multi-Agent Architecture
 
-- It uses the `@CrewBase` decorator to define the crew.
-- Agents are defined using the `@agent` decorator, and their configurations are loaded from `agents.yaml`.
-- Tasks are defined using the `@task` decorator, with configurations loaded from `tasks.yaml`.
-- The `crew()` method assembles the agents and tasks into a `Crew` object, specifying the process (e.g., `Process.sequential`).
+### 1) Requirement Interviewer Agent
 
-### 3. `config/agents.yaml`
+Purpose:
 
-This YAML file defines the properties of each agent in the crew. Each agent has:
+- Turn a vague user request into clear requirements.
 
-- `role`: The agent's designated function (e.g., "Senior Data Researcher").
-- `goal`: The agent's primary objective.
-- `backstory`: A brief narrative that gives the agent context and personality.
+Input:
 
-**Agents:**
+- User idea or problem statement.
 
-- **researcher**: Responsible for uncovering cutting-edge developments in a given topic.
-- **reporting_analyst**: Responsible for creating detailed reports based on research findings.
+Output artifact:
 
-### 4. `config/tasks.yaml`
+- `requirements_spec` containing goal, audience, tone, constraints, success criteria, and missing info.
 
-This YAML file defines the tasks that the crew will perform. Each task has:
+### 2) Context Analyzer Agent
 
-- `description`: A detailed explanation of what the task entails.
-- `expected_output`: A description of the desired outcome of the task.
-- `agent`: The agent assigned to perform the task.
+Purpose:
 
-**Tasks:**
+- Gather relevant project/domain context from docs, code, and optional web search.
 
-- **research_task**: A task for the `researcher` agent to conduct thorough research on a topic.
-- **reporting_task**: A task for the `reporting_analyst` agent to create a report from the research findings.
+Input:
 
-## How it Works
+- `requirements_spec`
 
-1.  The `run()` function in `main.py` is called.
-2.  It initializes the `PromptAgent` crew from `crew.py`.
-3.  The `PromptAgent` crew loads the agent and task configurations from the YAML files.
-4.  The `crew().kickoff()` method starts the execution, passing the initial inputs.
-5.  The agents perform their assigned tasks sequentially, with the output of one task potentially being the input for the next.
-6.  The final output is saved to `report.md`.
+Output artifact:
+
+- `context_brief` with key facts, dependencies, edge cases, and assumptions.
+
+### 3) Prompt Architect Agent
+
+Purpose:
+
+- Build a structured first draft prompt using best-practice prompting patterns.
+
+Input:
+
+- `requirements_spec`, `context_brief`
+
+Output artifact:
+
+- `prompt_draft_v1` with sections like role, objective, context, instructions, constraints, and output format.
+
+### 4) Prompt Critic Agent
+
+Purpose:
+
+- Critically review prompt quality and identify ambiguity or failure risks.
+
+Input:
+
+- `prompt_draft_v1`
+
+Output artifact:
+
+- `critique_report` with weaknesses, risk score, and concrete revisions.
+
+### 5) Prompt Refiner Agent
+
+Purpose:
+
+- Apply critique improvements and generate robust final prompt versions.
+
+Input:
+
+- `prompt_draft_v1`, `critique_report`
+
+Output artifact:
+
+- `prompt_final` and optional variants (`strict`, `balanced`, `creative`).
+
+### 6) QA and Policy Agent
+
+Purpose:
+
+- Validate completeness, formatting, and policy/safety alignment.
+
+Input:
+
+- `prompt_final`
+
+Output artifact:
+
+- `validation_report` and approved publishable package.
+
+## End-to-End Workflow
+
+1. Collect/clarify user intent.
+2. Build requirements spec.
+3. Collect context and constraints.
+4. Generate prompt draft.
+5. Critique and score.
+6. Refine into final prompt package.
+7. Validate quality and safety.
+8. Return final output with rationale and usage notes.
+
+## Codebase Mapping
+
+Current files:
+
+- `src/prompt_agent/crew.py`: crew definition, agent wiring, task wiring.
+- `src/prompt_agent/config/agents.yaml`: agent personas/goals.
+- `src/prompt_agent/config/tasks.yaml`: task descriptions and expected output.
+- `src/prompt_agent/main.py`: entry points (`run`, `train`, `replay`, `test`).
+- `src/prompt_agent/tools/custom_tool.py`: external tool integration (currently search).
+
+Near-term implementation direction:
+
+- Expand `agents.yaml` from 2 agents to the 6 target agents.
+- Expand `tasks.yaml` so each task emits one clear artifact.
+- Update `crew.py` to include the new agent and task methods.
+- Pass structured inputs (user_intent, domain, constraints, output_style) from `main.py`.
+- Add artifact persistence (for example in `knowledge/` or `outputs/`) for traceability.
+
+## Immediate Next Build Step
+
+Implement Phase 1 with 4 agents first:
+
+- Requirement Interviewer
+- Context Analyzer
+- Prompt Architect
+- Prompt Critic
+
+Then add Refiner and QA/Policy in Phase 2.
+
+This phased build keeps complexity manageable while moving the codebase directly toward the intended PromptForge architecture.
