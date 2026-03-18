@@ -4,7 +4,6 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
-
 @CrewBase
 class PromptAgent:
     """PromptAgent crew"""
@@ -50,6 +49,14 @@ class PromptAgent:
             llm=self.groq_llm
         )
 
+    @agent
+    def prompt_architect(self) -> Agent:
+        return Agent(
+            config=self.agents_config['prompt_architect'],
+            verbose=True,
+            llm=self.groq_llm
+        )
+
     @task
     def research_task(self) -> Task:
         return Task(
@@ -74,12 +81,22 @@ class PromptAgent:
             config=self.tasks_config['context_analysis_task'],
         )
 
+    @task
+    def prompt_drafting_task(self) -> Task:
+        return Task(
+            config=self.tasks_config['prompt_drafting_task'],
+        )
+
     @crew
     def crew(self) -> Crew:
         """Creates the PromptAgent crew"""
         return Crew(
             agents=self.agents,
-            tasks=self.tasks,
+            tasks=[
+                self.requirement_interview_task(),
+                self.context_analysis_task(),
+                self.prompt_drafting_task(),
+            ],
             process=Process.sequential,
             verbose=True,
            
