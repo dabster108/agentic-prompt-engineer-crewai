@@ -26,8 +26,10 @@ reporting_task:
 
 requirement_interview_task:
   description: >
-    Analyze the user's intent and convert it into a complete requirement specification
-    for prompt engineering. The specification must include objective, audience,
+    Analyze this user request and convert it into a complete requirement specification:
+    {user_input}
+
+    The specification must include objective, audience,
     tone/style preference, constraints, expected output format, success criteria,
     and any missing information assumptions.
 
@@ -53,12 +55,84 @@ context_analysis_task:
 prompt_drafting_task:
   description: >
     Using requirements_spec and context_brief, create the first production-ready
-    prompt draft. The draft must define role, objective, context, strict instructions,
-    boundaries, output format, and quality checks.
+    prompt draft for this exact user input: {user_input}.
+
+    Generate a practical "vibe coding" flow prompt that feels like a real
+    engineering handoff, not a generic textbook template.
+
+    Mandatory sections for every output:
+    ## Role
+    ## Goal
+    ## Task
+    ## Requirements
+    ## Input Format
+    ## Output Format
+    ## Edge Cases
+    ## Constraints
+    ## System Requirements
+    ## Prompting Strategy
+    ## Implementation Flow
+    ## Final Result Prompt
+
+    Inside "Prompting Strategy", include these subsections every time:
+    - Zero-Shot Prompting
+    - Few-Shot Prompting
+    - Chain-of-Thought Prompting (CoT)
+
+    Add these only when relevant to the user input:
+    - Text Summarization
+    - Text Classification
+    - Information Extraction
+    - Security Guardrails
+    - Domain-Specific Boundaries
+
+    "Final Result Prompt" must be copy-ready and formatted as a single markdown
+    prompt block for immediate use with an LLM.
+
+    Keep content detailed but practical:
+    - Specific to {user_input}
+    - Avoid filler and repeated lines
+    - Prefer actionable bullets and concrete constraints
 
   expected_output: >
-    A markdown section titled prompt_draft_v1 with headings: role,
-    objective, context, instructions, constraints, output_format,
-    and quality_checklist.
+    A single markdown output containing all mandatory headings in the exact order,
+    plus optional relevant headings only when needed, ending with
+    "## Final Result Prompt" containing one copy-ready prompt block.
 
   agent: prompt_architect
+
+prompt_critique_task:
+  description: >
+    Review prompt_draft_v1 and create a strict critique report. Identify ambiguous
+    instructions, missing constraints, inconsistent formatting, and likely failure
+    modes. For each issue provide a direct fix instruction.
+
+  expected_output: >
+    A markdown section titled critique_report with headings: strengths,
+    weaknesses, risk_score, and revision_actions.
+
+  agent: prompt_critic
+
+prompt_refinement_task:
+  description: >
+    Apply critique_report updates and produce a final user-facing prompt package.
+    The final output must be copy-ready markdown and must include all required
+    headings from the draft stage while improving clarity and execution quality.
+
+  expected_output: >
+    A markdown section titled prompt_final with headings: final_prompt,
+    strict_variant, balanced_variant, creative_variant, and usage_notes.
+
+  agent: prompt_refiner
+
+validation_task:
+  description: >
+    Validate prompt_final for completeness and formatting quality. Confirm all
+    required headings are present and that the output is safe, concise, and
+    directly usable in terminal-driven workflows.
+
+  expected_output: >
+    A markdown section titled validation_report with headings: checklist,
+    issues_found, and final_status. If valid, set final_status to approved.
+
+  agent: qa_policy_reviewer

@@ -15,7 +15,9 @@ class PromptAgent:
         self.groq_llm = LLM(
             model="groq/llama-3.1-8b-instant",
             api_key=os.getenv("GROQ_API_KEY"),
+            max_tokens=int(os.getenv("PROMPTFORGE_MAX_TOKENS", "900")),
         )
+        self.fast_mode = os.getenv("PROMPTFORGE_FAST_MODE", "true").lower() == "true"
 
     @agent
     def researcher(self) -> Agent:
@@ -57,6 +59,30 @@ class PromptAgent:
             llm=self.groq_llm
         )
 
+    @agent
+    def prompt_critic(self) -> Agent:
+        return Agent(
+            config=self.agents_config['prompt_critic'],
+            verbose=True,
+            llm=self.groq_llm
+        )
+
+    @agent
+    def prompt_refiner(self) -> Agent:
+        return Agent(
+            config=self.agents_config['prompt_refiner'],
+            verbose=True,
+            llm=self.groq_llm
+        )
+
+    @agent
+    def qa_policy_reviewer(self) -> Agent:
+        return Agent(
+            config=self.agents_config['qa_policy_reviewer'],
+            verbose=True,
+            llm=self.groq_llm
+        )
+
     @task
     def research_task(self) -> Task:
         return Task(
@@ -87,16 +113,43 @@ class PromptAgent:
             config=self.tasks_config['prompt_drafting_task'],
         )
 
+    @task
+    def prompt_critique_task(self) -> Task:
+        return Task(
+            config=self.tasks_config['prompt_critique_task'],
+        )
+
+    @task
+    def prompt_refinement_task(self) -> Task:
+        return Task(
+            config=self.tasks_config['prompt_refinement_task'],
+        )
+
+    @task
+    def validation_task(self) -> Task:
+        return Task(
+            config=self.tasks_config['validation_task'],
+        )
+
     @crew
     def crew(self) -> Crew:
         """Creates the PromptAgent crew"""
+        task_sequence = [
+            self.requirement_interview_task(),
+            self.context_analysis_task(),
+            self.prompt_drafting_task(),
+        ]
+
+        if not self.fast_mode:
+            task_sequence.extend([
+                self.prompt_critique_task(),
+                self.prompt_refinement_task(),
+                self.validation_task(),
+            ])
+
         return Crew(
             agents=self.agents,
-            tasks=[
-                self.requirement_interview_task(),
-                self.context_analysis_task(),
-                self.prompt_drafting_task(),
-            ],
+            tasks=task_sequence,
             process=Process.sequential,
             verbose=True,
            

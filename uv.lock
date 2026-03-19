@@ -2467,6 +2467,7 @@ dependencies = [
     { name = "litellm" },
     { name = "opik" },
     { name = "python-dotenv" },
+    { name = "uvicorn" },
 ]
 
 [package.metadata]
@@ -2480,6 +2481,7 @@ requires-dist = [
     { name = "litellm", specifier = ">=1.75.3" },
     { name = "opik", specifier = ">=1.8.0" },
     { name = "python-dotenv", specifier = ">=1.1.1" },
+    { name = "uvicorn", specifier = ">=0.34.0" },
 ]
 
 [[package]]
