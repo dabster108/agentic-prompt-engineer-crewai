@@ -70,7 +70,6 @@ def _sanitize_agent_output(text: str) -> str:
     cleaned = re.sub(r"(?m)^\s*[-*+]\s+", "", cleaned)
     cleaned = re.sub(r"(?m)^\s*\d+\.\s+", "", cleaned)
     cleaned = cleaned.replace("*", "")
-    cleaned = cleaned.replace("_", "")
     cleaned = cleaned.replace("`", "")
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     return cleaned.strip()

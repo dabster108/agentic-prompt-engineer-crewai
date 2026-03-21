@@ -29,9 +29,16 @@ requirement_interview_task:
     Analyze this user request and convert it into a complete requirement specification:
     {user_input}
 
-    The specification must include objective, audience,
-    tone/style preference, constraints, expected output format, success criteria,
-    and any missing information assumptions.
+    Treat user-provided sample prompts as style references unless the user explicitly
+    asks to merge them into one prompt. If multiple examples are present, identify
+    the primary objective and list secondary references as inspiration only.
+
+    The specification must include: primary_objective, audience,
+    tone_style_preference, non_negotiable_rules, optional_preferences,
+    expected_output_format, success_criteria, and missing_information_assumptions.
+
+    If the user gives direct wording for policy, safety, tone, or response style,
+    preserve that wording with minimal edits.
 
     Output style rules:
     - Plain text only
@@ -40,8 +47,9 @@ requirement_interview_task:
     - Keep section flow clean and readable using simple labels
 
   expected_output: >
-    A plain-text section titled requirements_spec with clear headings: objective,
-    audience, tone_style, constraints, output_format, success_criteria,
+    A plain-text section titled requirements_spec with clear headings:
+    primary_objective, audience, tone_style_preference, non_negotiable_rules,
+    optional_preferences, expected_output_format, success_criteria,
     and missing_information_assumptions.
 
   agent: requirement_interviewer
@@ -69,52 +77,52 @@ prompt_drafting_task:
     Using requirements_spec and context_brief, create the first production-ready
     prompt draft for this exact user input: {user_input}.
 
-    Generate a practical "vibe coding" flow prompt that feels like a real
-    engineering handoff, not a generic textbook template.
+    Build an adaptive prompt package, not a rigid universal template.
+    If the user already provided a preferred structure (for example: Role, Core Rules,
+    Safety, Response Style), keep that structure and improve clarity.
 
-    Mandatory sections for every output:
-    ## Role
-    ## Goal
-    ## Task
-    ## Requirements
-    ## Input Format
-    ## Output Format
-    ## Edge Cases
-    ## Constraints
-    ## System Requirements
-    ## Prompting Strategy
-    ## Implementation Flow
-    ## Final Result Prompt
+    If no explicit structure is provided by the user, use this default structure:
+    role
+    goal
+    task
+    requirements
+    constraints
+    output_format
+    final_result_prompt
 
-    Inside "Prompting Strategy", include these subsections every time:
-    - Zero-Shot Prompting
-    - Few-Shot Prompting
-    - Chain-of-Thought Prompting (CoT)
+    Writing quality requirements:
+    - Natural, concise, and human phrasing
+    - Avoid repetitive sentence openings and repeated wording
+    - Avoid robotic filler, generic hype, or over-explaining
+    - Keep constraints explicit and enforceable
+    - Keep the final prompt immediately copy-ready
 
-    Add these only when relevant to the user input:
-    - Text Summarization
-    - Text Classification
-    - Information Extraction
-    - Security Guardrails
-    - Domain-Specific Boundaries
+    For user requests that define a behavioral persona, ensure the final prompt includes:
+    - role boundaries
+    - response behavior rules
+    - safety escalation behavior
+    - formatting and tone controls
+    - explicit "do not" constraints from the user
 
-    "Final Result Prompt" must be copy-ready plain text for immediate use with an LLM.
+    If the user asks for customization from examples, infer reusable style rules
+    from the examples and apply them to the primary objective.
 
     Output style rules:
     - Plain text only
     - Do not use markdown syntax
     - Do not use *, #, -, _, or backticks as formatting markers
-    - Keep heading order exact and keep flow natural and clean
+    Keep flow natural and clean
 
     Keep content detailed but practical:
     - Specific to {user_input}
     - Avoid filler and repeated lines
-    - Prefer actionable bullets and concrete constraints
+    - Prefer concrete constraints and direct language
 
   expected_output: >
-    A single plain-text output containing all mandatory headings in the exact order,
-    plus optional relevant headings only when needed, ending with
-    "Final Result Prompt" containing one copy-ready final prompt.
+    A single plain-text output titled prompt_draft_v1 containing headings:
+    role, goal, task, requirements, constraints, output_format,
+    final_result_prompt, and short_rationale.
+    final_result_prompt must be one copy-ready final prompt in the user's preferred style.
 
   agent: prompt_architect
 
@@ -123,6 +131,9 @@ prompt_critique_task:
     Review prompt_draft_v1 and create a strict critique report. Identify ambiguous
     instructions, missing constraints, inconsistent formatting, and likely failure
     modes. For each issue provide a direct fix instruction.
+
+    Add a concision_and_humanity review that checks for robotic tone,
+    repeated wording, and unnecessary verbosity.
 
     Output style rules:
     - Plain text only
@@ -138,8 +149,14 @@ prompt_critique_task:
 prompt_refinement_task:
   description: >
     Apply critique_report updates and produce a final user-facing prompt package.
-    The final output must be copy-ready plain text and must include all required
-    headings from the draft stage while improving clarity and execution quality.
+    The final output must be copy-ready plain text and must preserve the user's
+    preferred structure while improving clarity and execution quality.
+
+    Prioritize brevity, natural flow, and non-repetitive phrasing.
+    If multiple variants are not requested, return only one final prompt.
+
+    Keep or restore clear section labels in the final package so users can see
+    role and requirements explicitly.
 
     Output style rules:
     - Plain text only
@@ -147,8 +164,10 @@ prompt_refinement_task:
     - Do not use *, #, -, _, or backticks as formatting markers
 
   expected_output: >
-    A plain-text section titled prompt_final with headings: final_prompt,
-    strict_variant, balanced_variant, creative_variant, and usage_notes.
+    A plain-text section titled prompt_final with headings:
+    role, goal, task, requirements, constraints, output_format,
+    final_prompt, and usage_notes.
+    Include strict_variant, balanced_variant, and creative_variant only if explicitly requested.
 
   agent: prompt_refiner
 
@@ -157,6 +176,9 @@ validation_task:
     Validate prompt_final for completeness and formatting quality. Confirm all
     required headings are present and that the output is safe, concise, and
     directly usable in terminal-driven workflows.
+
+    Verify the final prompt is not robotic: no repeated sentence starters,
+    no bloated filler, and no contradictory rules.
 
     Output style rules:
     - Plain text only

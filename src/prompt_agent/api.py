@@ -58,9 +58,8 @@ def _sanitize_agent_output(text: str) -> str:
     cleaned = re.sub(r"(?m)^\s*[-*+]\s+", "", cleaned)
     cleaned = re.sub(r"(?m)^\s*\d+\.\s+", "", cleaned)
 
-    # Remove emphasis-style asterisks/underscores and backticks.
+    # Remove emphasis-style asterisks and backticks.
     cleaned = cleaned.replace("*", "")
-    cleaned = cleaned.replace("_", "")
     cleaned = cleaned.replace("`", "")
 
     # Collapse excessive blank lines to keep the response flow compact.
