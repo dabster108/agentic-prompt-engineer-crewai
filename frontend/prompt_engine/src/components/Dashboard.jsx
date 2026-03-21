@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "../styles/Dashboard.css";
 import { Sparkles, Plus, Mic } from "lucide-react";
 
@@ -8,6 +8,14 @@ export default function Dashboard() {
   const [generatedPrompt, setGeneratedPrompt] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [activeStepIndex, setActiveStepIndex] = useState(0);
+  const [loadingDots, setLoadingDots] = useState("");
+
+  const loadingSteps = [
+    "Task started",
+    "Executing prompt engine",
+    "Finalizing answer",
+  ];
 
   const actionButtons = [
     { label: "Write" },
@@ -24,6 +32,27 @@ export default function Dashboard() {
   const handleInputBlur = (e) => {
     e.target.parentElement.classList.remove("focused");
   };
+
+  useEffect(() => {
+    if (!isLoading) {
+      setLoadingDots("");
+      setActiveStepIndex(0);
+      return;
+    }
+
+    const stepInterval = setInterval(() => {
+      setActiveStepIndex((current) => (current + 1) % loadingSteps.length);
+    }, 1300);
+
+    const dotsInterval = setInterval(() => {
+      setLoadingDots((current) => (current.length >= 3 ? "" : `${current}.`));
+    }, 350);
+
+    return () => {
+      clearInterval(stepInterval);
+      clearInterval(dotsInterval);
+    };
+  }, [isLoading, loadingSteps.length]);
 
   const generatePrompt = async () => {
     const trimmedInput = inputValue.trim();
@@ -147,7 +176,45 @@ export default function Dashboard() {
           {(isLoading || errorMessage || generatedPrompt) && (
             <div className="result-panel" aria-live="polite">
               {isLoading && (
-                <p className="result-loading">Generating prompt...</p>
+                <div
+                  className="execution-state"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <div className="execution-loader" aria-hidden="true">
+                    <span className="loader-ring" />
+                    <span className="loader-core" />
+                    <span className="loader-orbit-dot" />
+                  </div>
+
+                  <div className="execution-text">
+                    <p className="result-loading-title">Generating prompt</p>
+                    <p className="result-loading-subtitle">
+                      {loadingSteps[activeStepIndex]}
+                      {loadingDots}
+                    </p>
+                    <div className="execution-steps" aria-hidden="true">
+                      {loadingSteps.map((step, index) => {
+                        const stepState =
+                          index < activeStepIndex
+                            ? "done"
+                            : index === activeStepIndex
+                              ? "active"
+                              : "pending";
+
+                        return (
+                          <div
+                            key={step}
+                            className={`execution-step execution-step-${stepState}`}
+                          >
+                            <span className="execution-step-dot" />
+                            <span className="execution-step-label">{step}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
               )}
               {errorMessage && <p className="result-error">{errorMessage}</p>}
               {generatedPrompt && (
