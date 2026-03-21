@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 import os
+import re
 import time
 import uuid
 
@@ -45,6 +46,26 @@ def _extract_crew_text(result: object) -> str:
         if value:
             return str(value).strip()
     return str(result).strip()
+
+
+def _sanitize_agent_output(text: str) -> str:
+    """Normalize model output to plain readable text for API consumers."""
+    cleaned = text.replace("\r\n", "\n").replace("\r", "\n")
+    cleaned = cleaned.replace("```", "")
+
+    # Remove common markdown heading markers and list markers.
+    cleaned = re.sub(r"(?m)^\s*#{1,6}\s*", "", cleaned)
+    cleaned = re.sub(r"(?m)^\s*[-*+]\s+", "", cleaned)
+    cleaned = re.sub(r"(?m)^\s*\d+\.\s+", "", cleaned)
+
+    # Remove emphasis-style asterisks/underscores and backticks.
+    cleaned = cleaned.replace("*", "")
+    cleaned = cleaned.replace("_", "")
+    cleaned = cleaned.replace("`", "")
+
+    # Collapse excessive blank lines to keep the response flow compact.
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
 
 
 def _kickoff_with_compatibility(crew_instance, inputs: dict[str, str], thread_id: str):
@@ -105,7 +126,7 @@ def create_prompt(payload: PromptRequest) -> PromptResponse:
             inputs={"user_input": user_input},
             thread_id=thread_id,
         )
-        prompt_text = _extract_crew_text(crew_result)
+        prompt_text = _sanitize_agent_output(_extract_crew_text(crew_result))
     except Exception as error:
         raise HTTPException(status_code=500, detail=f"CrewAI failed: {error}") from error
 

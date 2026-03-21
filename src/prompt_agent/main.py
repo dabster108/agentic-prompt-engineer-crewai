@@ -1,5 +1,6 @@
 import sys
 import os
+import re
 import uuid
 import time
 from .crew import PromptAgent
@@ -60,6 +61,28 @@ def _run_with_rate_limit_retry(crew_instance, inputs, thread_id):
             print(f"\nRate limit reached. Waiting {wait_seconds}s before retry {attempt + 1}/{max_attempts}...")
             time.sleep(wait_seconds)
 
+
+def _sanitize_agent_output(text: str) -> str:
+    """Normalize model output to plain readable text for terminal output."""
+    cleaned = text.replace("\r\n", "\n").replace("\r", "\n")
+    cleaned = cleaned.replace("```", "")
+    cleaned = re.sub(r"(?m)^\s*#{1,6}\s*", "", cleaned)
+    cleaned = re.sub(r"(?m)^\s*[-*+]\s+", "", cleaned)
+    cleaned = re.sub(r"(?m)^\s*\d+\.\s+", "", cleaned)
+    cleaned = cleaned.replace("*", "")
+    cleaned = cleaned.replace("_", "")
+    cleaned = cleaned.replace("`", "")
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
+
+
+def _extract_crew_text(result: object) -> str:
+    for attr in ("raw", "result", "output"):
+        value = getattr(result, attr, None)
+        if value:
+            return str(value).strip()
+    return str(result).strip()
+
 def run():
     """
     Run the crew.
@@ -73,7 +96,7 @@ def run():
         thread_id=thread_id,
     )
     print("\nFINAL RESULT:\n")
-    print(result)
+    print(_sanitize_agent_output(_extract_crew_text(result)))
 
 def train():
     """
