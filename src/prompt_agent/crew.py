@@ -17,7 +17,7 @@ class PromptAgent:
             api_key=os.getenv("GROQ_API_KEY"),
             max_tokens=int(os.getenv("PROMPTFORGE_MAX_TOKENS", "900")),
         )
-        self.fast_mode = os.getenv("PROMPTFORGE_FAST_MODE", "true").lower() == "true"
+        self.fast_mode = os.getenv("PROMPTFORGE_FAST_MODE", "false").lower() == "true"
 
     @agent
     def researcher(self) -> Agent:
