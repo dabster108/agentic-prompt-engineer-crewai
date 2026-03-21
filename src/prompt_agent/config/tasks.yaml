@@ -33,8 +33,14 @@ requirement_interview_task:
     tone/style preference, constraints, expected output format, success criteria,
     and any missing information assumptions.
 
+    Output style rules:
+    - Plain text only
+    - Do not use markdown syntax
+    - Do not use *, #, -, _, or backticks as formatting markers
+    - Keep section flow clean and readable using simple labels
+
   expected_output: >
-    A markdown section titled requirements_spec with clear headings: objective,
+    A plain-text section titled requirements_spec with clear headings: objective,
     audience, tone_style, constraints, output_format, success_criteria,
     and missing_information_assumptions.
 
@@ -46,8 +52,14 @@ context_analysis_task:
     context brief that will guide prompt construction. Identify key domain details,
     risks, dependencies, edge cases, and operational assumptions.
 
+    Output style rules:
+    - Plain text only
+    - Do not use markdown syntax
+    - Do not use *, #, -, _, or backticks as formatting markers
+    - Keep section flow clean and readable using simple labels
+
   expected_output: >
-    A markdown section titled context_brief with headings: domain_context,
+    A plain-text section titled context_brief with headings: domain_context,
     key_constraints, dependencies, edge_cases, risk_notes, and assumptions.
 
   agent: context_analyzer
@@ -86,8 +98,13 @@ prompt_drafting_task:
     - Security Guardrails
     - Domain-Specific Boundaries
 
-    "Final Result Prompt" must be copy-ready and formatted as a single markdown
-    prompt block for immediate use with an LLM.
+    "Final Result Prompt" must be copy-ready plain text for immediate use with an LLM.
+
+    Output style rules:
+    - Plain text only
+    - Do not use markdown syntax
+    - Do not use *, #, -, _, or backticks as formatting markers
+    - Keep heading order exact and keep flow natural and clean
 
     Keep content detailed but practical:
     - Specific to {user_input}
@@ -95,9 +112,9 @@ prompt_drafting_task:
     - Prefer actionable bullets and concrete constraints
 
   expected_output: >
-    A single markdown output containing all mandatory headings in the exact order,
+    A single plain-text output containing all mandatory headings in the exact order,
     plus optional relevant headings only when needed, ending with
-    "## Final Result Prompt" containing one copy-ready prompt block.
+    "Final Result Prompt" containing one copy-ready final prompt.
 
   agent: prompt_architect
 
@@ -107,8 +124,13 @@ prompt_critique_task:
     instructions, missing constraints, inconsistent formatting, and likely failure
     modes. For each issue provide a direct fix instruction.
 
+    Output style rules:
+    - Plain text only
+    - Do not use markdown syntax
+    - Do not use *, #, -, _, or backticks as formatting markers
+
   expected_output: >
-    A markdown section titled critique_report with headings: strengths,
+    A plain-text section titled critique_report with headings: strengths,
     weaknesses, risk_score, and revision_actions.
 
   agent: prompt_critic
@@ -116,11 +138,16 @@ prompt_critique_task:
 prompt_refinement_task:
   description: >
     Apply critique_report updates and produce a final user-facing prompt package.
-    The final output must be copy-ready markdown and must include all required
+    The final output must be copy-ready plain text and must include all required
     headings from the draft stage while improving clarity and execution quality.
 
+    Output style rules:
+    - Plain text only
+    - Do not use markdown syntax
+    - Do not use *, #, -, _, or backticks as formatting markers
+
   expected_output: >
-    A markdown section titled prompt_final with headings: final_prompt,
+    A plain-text section titled prompt_final with headings: final_prompt,
     strict_variant, balanced_variant, creative_variant, and usage_notes.
 
   agent: prompt_refiner
@@ -131,8 +158,13 @@ validation_task:
     required headings are present and that the output is safe, concise, and
     directly usable in terminal-driven workflows.
 
+    Output style rules:
+    - Plain text only
+    - Do not use markdown syntax
+    - Do not use *, #, -, _, or backticks as formatting markers
+
   expected_output: >
-    A markdown section titled validation_report with headings: checklist,
+    A plain-text section titled validation_report with headings: checklist,
     issues_found, and final_status. If valid, set final_status to approved.
 
   agent: qa_policy_reviewer
