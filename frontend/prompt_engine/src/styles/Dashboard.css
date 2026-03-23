@@ -269,7 +269,7 @@
 .execution-text {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.5rem;
 }
 
 .result-loading-title {
@@ -287,39 +287,62 @@
 
 .execution-steps {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 0.1rem;
+  align-items: center;
+  gap: 0.2rem;
+  margin-top: 0.2rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid #e8e1d8;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fffdf9 0%, #faf6f0 100%);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.execution-step-item {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .execution-step {
   display: inline-flex;
   align-items: center;
-  gap: 0.38rem;
+  gap: 0.34rem;
   border-radius: 999px;
-  padding: 0.2rem 0.55rem;
+  padding: 0.18rem 0.52rem;
   border: 1px solid transparent;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   line-height: 1;
 }
 
 .execution-step-dot {
-  width: 0.45rem;
-  height: 0.45rem;
+  width: 0.42rem;
+  height: 0.42rem;
   border-radius: 50%;
   background: #b8aea2;
 }
 
+.execution-step-connector {
+  width: 22px;
+  height: 1px;
+  margin: 0 0.25rem;
+  background: #dbd3c8;
+  opacity: 0.9;
+}
+
 .execution-step-pending {
-  background: rgba(238, 233, 226, 0.55);
+  background: rgba(238, 233, 226, 0.62);
   color: #8a837b;
 }
 
 .execution-step-active {
-  background: rgba(245, 232, 214, 0.9);
+  background: rgba(245, 232, 214, 0.95);
   border-color: #e7d2b5;
   color: #6e5231;
   animation: step-breathing 1s ease-in-out infinite;
+  box-shadow: 0 4px 10px rgba(197, 150, 88, 0.18);
 }
 
 .execution-step-active .execution-step-dot {
@@ -334,6 +357,11 @@
 
 .execution-step-done .execution-step-dot {
   background: #6e9d74;
+}
+
+.execution-step-connector-active,
+.execution-step-connector-done {
+  background: linear-gradient(90deg, #d9bea0 0%, #d7c8b6 100%);
 }
 
 @keyframes ring-spin {
@@ -430,7 +458,8 @@
   }
 
   .execution-steps {
-    justify-content: center;
+    max-width: 100%;
+    justify-content: flex-start;
   }
 }
 
