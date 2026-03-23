@@ -4,6 +4,8 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
 @CrewBase
 class PromptAgent:
     """PromptAgent crew"""
@@ -12,76 +14,56 @@ class PromptAgent:
     tasks_config = 'config/tasks.yaml'
 
     def __init__(self):
+        self.verbose = os.getenv("PROMPTFORGE_VERBOSE", "false").lower() == "true"
         self.groq_llm = LLM(
-            model="groq/llama-3.1-8b-instant",
+            model=os.getenv("PROMPTFORGE_LLM_MODEL", "groq/llama-3.1-8b-instant"),
             api_key=os.getenv("GROQ_API_KEY"),
             max_tokens=int(os.getenv("PROMPTFORGE_MAX_TOKENS", "900")),
         )
         self.fast_mode = os.getenv("PROMPTFORGE_FAST_MODE", "false").lower() == "true"
+        self.max_rpm = int(os.getenv("PROMPTFORGE_MAX_RPM", "60"))
+        process_name = os.getenv("PROMPTFORGE_PROCESS", "sequential").strip().lower()
+        self.crew_process = Process.hierarchical if process_name == "hierarchical" else Process.sequential
+
+    def _build_agent(self, config_key: str) -> Agent:
+        return Agent(
+            config=self.agents_config[config_key],
+            verbose=self.verbose,
+            llm=self.groq_llm,
+            max_rpm=self.max_rpm,
+        )
 
     @agent
     def researcher(self) -> Agent:
-        return Agent(
-            config=self.agents_config['researcher'],
-            verbose=True,
-            llm=self.groq_llm
-        )
+        return self._build_agent('researcher')
 
     @agent
     def reporting_analyst(self) -> Agent:
-        return Agent(
-            config=self.agents_config['reporting_analyst'],
-            verbose=True,
-            llm=self.groq_llm
-        )
+        return self._build_agent('reporting_analyst')
 
     @agent
     def requirement_interviewer(self) -> Agent:
-        return Agent(
-            config=self.agents_config['requirement_interviewer'],
-            verbose=True,
-            llm=self.groq_llm
-        )
+        return self._build_agent('requirement_interviewer')
 
     @agent
     def context_analyzer(self) -> Agent:
-        return Agent(
-            config=self.agents_config['context_analyzer'],
-            verbose=True,
-            llm=self.groq_llm
-        )
+        return self._build_agent('context_analyzer')
 
     @agent
     def prompt_architect(self) -> Agent:
-        return Agent(
-            config=self.agents_config['prompt_architect'],
-            verbose=True,
-            llm=self.groq_llm
-        )
+        return self._build_agent('prompt_architect')
 
     @agent
     def prompt_critic(self) -> Agent:
-        return Agent(
-            config=self.agents_config['prompt_critic'],
-            verbose=True,
-            llm=self.groq_llm
-        )
+        return self._build_agent('prompt_critic')
 
     @agent
     def prompt_refiner(self) -> Agent:
-        return Agent(
-            config=self.agents_config['prompt_refiner'],
-            verbose=True,
-            llm=self.groq_llm
-        )
+        return self._build_agent('prompt_refiner')
 
     @agent
     def qa_policy_reviewer(self) -> Agent:
-        return Agent(
-            config=self.agents_config['qa_policy_reviewer'],
-            verbose=True,
-            llm=self.groq_llm
-        )
+        return self._build_agent('qa_policy_reviewer')
 
     @task
     def research_task(self) -> Task:
@@ -150,7 +132,6 @@ class PromptAgent:
         return Crew(
             agents=self.agents,
             tasks=task_sequence,
-            process=Process.sequential,
-            verbose=True,
-           
+            process=self.crew_process,
+            verbose=self.verbose,
         )
