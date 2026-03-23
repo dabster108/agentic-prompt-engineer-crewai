@@ -12,9 +12,9 @@ export default function Dashboard() {
   const [loadingDots, setLoadingDots] = useState("");
 
   const loadingSteps = [
-    "Task started",
-    "Executing prompt engine",
-    "Finalizing answer",
+    { short: "Start", detail: "Task started" },
+    { short: "Engine", detail: "Executing prompt engine" },
+    { short: "Finish", detail: "Finalizing answer" },
   ];
 
   const actionButtons = [
@@ -41,7 +41,9 @@ export default function Dashboard() {
     }
 
     const stepInterval = setInterval(() => {
-      setActiveStepIndex((current) => (current + 1) % loadingSteps.length);
+      setActiveStepIndex((current) =>
+        current < loadingSteps.length - 1 ? current + 1 : current,
+      );
     }, 1300);
 
     const dotsInterval = setInterval(() => {
@@ -190,7 +192,7 @@ export default function Dashboard() {
                   <div className="execution-text">
                     <p className="result-loading-title">Generating prompt</p>
                     <p className="result-loading-subtitle">
-                      {loadingSteps[activeStepIndex]}
+                      {loadingSteps[activeStepIndex].detail}
                       {loadingDots}
                     </p>
                     <div className="execution-steps" aria-hidden="true">
@@ -203,12 +205,20 @@ export default function Dashboard() {
                               : "pending";
 
                         return (
-                          <div
-                            key={step}
-                            className={`execution-step execution-step-${stepState}`}
-                          >
-                            <span className="execution-step-dot" />
-                            <span className="execution-step-label">{step}</span>
+                          <div className="execution-step-item" key={step.short}>
+                            <div
+                              className={`execution-step execution-step-${stepState}`}
+                            >
+                              <span className="execution-step-dot" />
+                              <span className="execution-step-label">
+                                {step.short}
+                              </span>
+                            </div>
+                            {index < loadingSteps.length - 1 && (
+                              <span
+                                className={`execution-step-connector execution-step-connector-${stepState}`}
+                              />
+                            )}
                           </div>
                         );
                       })}
