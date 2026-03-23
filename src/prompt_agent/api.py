@@ -1,12 +1,13 @@
+import asyncio
 from datetime import datetime, timezone
 import os
 import re
-import time
 import uuid
 
 from fastapi import FastAPI
 from fastapi import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
 from .crew import PromptAgent
@@ -67,31 +68,32 @@ def _sanitize_agent_output(text: str) -> str:
     return cleaned.strip()
 
 
-def _kickoff_with_compatibility(crew_instance, inputs: dict[str, str], thread_id: str):
+async def _kickoff_with_compatibility(crew_instance, inputs: dict[str, str], thread_id: str):
     try:
-        return crew_instance.kickoff(
+        return await run_in_threadpool(
+            crew_instance.kickoff,
             inputs=inputs,
             opik_args={"trace": {"thread_id": thread_id}},
         )
     except TypeError as error:
         if "opik_args" not in str(error):
             raise
-        return crew_instance.kickoff(inputs=inputs)
+        return await run_in_threadpool(crew_instance.kickoff, inputs=inputs)
 
 
-def _run_with_rate_limit_retry(crew_instance, inputs: dict[str, str], thread_id: str):
+async def _run_with_rate_limit_retry(crew_instance, inputs: dict[str, str], thread_id: str):
     max_attempts = int(os.getenv("PROMPTFORGE_MAX_RETRIES", "2"))
     wait_seconds = int(os.getenv("PROMPTFORGE_RETRY_WAIT_SECONDS", "35"))
 
     for attempt in range(1, max_attempts + 1):
         try:
-            return _kickoff_with_compatibility(crew_instance, inputs, thread_id)
+            return await _kickoff_with_compatibility(crew_instance, inputs, thread_id)
         except Exception as error:
             error_text = str(error).lower()
             is_rate_limit = "rate limit" in error_text or "rate_limit_exceeded" in error_text
             if not is_rate_limit or attempt == max_attempts:
                 raise
-            time.sleep(wait_seconds)
+            await asyncio.sleep(wait_seconds)
 
     raise RuntimeError("CrewAI execution failed after retries")
 
@@ -113,14 +115,14 @@ def health_check() -> dict[str, str]:
 
 
 @app.post("/api/prompt", response_model=PromptResponse)
-def create_prompt(payload: PromptRequest) -> PromptResponse:
+async def create_prompt(payload: PromptRequest) -> PromptResponse:
     thread_id = os.getenv("OPIK_THREAD_ID", f"prompt-agent-{uuid.uuid4()}")
     # Keep UI-selected model visible to agents without changing existing task templates.
     user_input = f"{payload.user_input.strip()}\n\nPreferred model: {payload.model}"
 
     try:
         crew_instance = _create_tracked_crew()
-        crew_result = _run_with_rate_limit_retry(
+        crew_result = await _run_with_rate_limit_retry(
             crew_instance=crew_instance,
             inputs={"user_input": user_input},
             thread_id=thread_id,
