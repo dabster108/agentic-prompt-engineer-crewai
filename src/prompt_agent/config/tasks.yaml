@@ -29,6 +29,20 @@ requirement_interview_task:
     Analyze this user request and convert it into a complete requirement specification:
     {user_input}
 
+    Also use these structured generation preferences:
+    {generation_brief}
+
+    Treat prompt_mode and response_length as strict controls.
+    - prompt_mode=prompt_engineering means precision-first, explicit constraints,
+      and technical clarity.
+    - prompt_mode=vibe_coding means practical builder tone, fast implementation
+      orientation, and high usefulness for coding workflows.
+
+    response_length controls depth:
+    - short: compact, highest-signal requirements only
+    - balanced: practical detail with concise structure
+    - long: deeper specification with richer constraints and edge handling
+
     Treat user-provided sample prompts as style references unless the user explicitly
     asks to merge them into one prompt. If multiple examples are present, identify
     the primary objective and list secondary references as inspiration only.
@@ -60,6 +74,8 @@ context_analysis_task:
     context brief that will guide prompt construction. Identify key domain details,
     risks, dependencies, edge cases, and operational assumptions.
 
+    Respect response_length depth control from generation preferences.
+
     Output style rules:
     - Plain text only
     - Do not use markdown syntax
@@ -76,6 +92,21 @@ prompt_drafting_task:
   description: >
     Using requirements_spec and context_brief, create the first production-ready
     prompt draft for this exact user input: {user_input}.
+
+    Use these generation preferences as mandatory controls:
+    model={model}
+    prompt_mode={prompt_mode}
+    response_length={response_length}
+
+    If prompt_mode is prompt_engineering, bias toward explicit instruction design,
+    stronger output contracts, and deterministic constraints.
+    If prompt_mode is vibe_coding, bias toward builder-friendly language,
+    implementation momentum, and practical coding delivery.
+
+    response_length depth rules:
+    - short: minimal but complete output, no unnecessary rationale
+    - balanced: one complete practical package with moderate detail
+    - long: fuller constraints, examples, and stronger edge-case guidance
 
     Build an adaptive prompt package, not a rigid universal template.
     If the user already provided a preferred structure (for example: Role, Core Rules,
@@ -151,6 +182,10 @@ prompt_refinement_task:
     Apply critique_report updates and produce a final user-facing prompt package.
     The final output must be copy-ready plain text and must preserve the user's
     preferred structure while improving clarity and execution quality.
+
+    Enforce mode and length controls from generation preferences.
+    The final_prompt section must reflect the selected prompt_mode voice and
+    selected response_length depth.
 
     Prioritize brevity, natural flow, and non-repetitive phrasing.
     If multiple variants are not requested, return only one final prompt.

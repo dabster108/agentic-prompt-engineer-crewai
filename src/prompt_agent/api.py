@@ -2,6 +2,7 @@ import asyncio
 from datetime import datetime, timezone
 import os
 import re
+from typing import Literal
 import uuid
 
 from fastapi import FastAPI
@@ -21,12 +22,32 @@ except ImportError:
 class PromptRequest(BaseModel):
     user_input: str = Field(min_length=1, max_length=2000)
     model: str = Field(default="Haiku 4.5", min_length=1, max_length=100)
+    prompt_mode: Literal["prompt_engineering", "vibe_coding"] = "prompt_engineering"
+    response_length: Literal["short", "balanced", "long"] = "balanced"
 
 
 class PromptResponse(BaseModel):
     prompt: str
     style: str
+    model: str
+    prompt_mode: str
+    response_length: str
     generated_at: str
+
+
+def _build_generation_brief(payload: PromptRequest) -> str:
+    """Build a structured, model-friendly brief to improve reliability and control."""
+    return (
+        "user_request:\n"
+        f"{payload.user_input.strip()}\n\n"
+        "generation_preferences:\n"
+        f"model: {payload.model}\n"
+        f"prompt_mode: {payload.prompt_mode}\n"
+        f"response_length: {payload.response_length}\n\n"
+        "delivery_expectation:\n"
+        "Return one final copy-ready prompt package that follows the selected mode "
+        "and requested response length. Keep language natural, direct, and practical."
+    )
 
 
 def _create_tracked_crew():
@@ -117,22 +138,36 @@ def health_check() -> dict[str, str]:
 @app.post("/api/prompt", response_model=PromptResponse)
 async def create_prompt(payload: PromptRequest) -> PromptResponse:
     thread_id = os.getenv("OPIK_THREAD_ID", f"prompt-agent-{uuid.uuid4()}")
-    # Keep UI-selected model visible to agents without changing existing task templates.
-    user_input = f"{payload.user_input.strip()}\n\nPreferred model: {payload.model}"
+    generation_brief = _build_generation_brief(payload)
 
     try:
         crew_instance = _create_tracked_crew()
         crew_result = await _run_with_rate_limit_retry(
             crew_instance=crew_instance,
-            inputs={"user_input": user_input},
+            inputs={
+                "user_input": payload.user_input.strip(),
+                "model": payload.model,
+                "prompt_mode": payload.prompt_mode,
+                "response_length": payload.response_length,
+                "generation_brief": generation_brief,
+            },
             thread_id=thread_id,
         )
         prompt_text = _sanitize_agent_output(_extract_crew_text(crew_result))
     except Exception as error:
-        raise HTTPException(status_code=500, detail=f"CrewAI failed: {error}") from error
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Prompt generation failed while executing CrewAI. "
+                f"Details: {error}"
+            ),
+        ) from error
 
     return PromptResponse(
         prompt=prompt_text,
         style="crew",
+        model=payload.model,
+        prompt_mode=payload.prompt_mode,
+        response_length=payload.response_length,
         generated_at=datetime.now(timezone.utc).isoformat(),
     )
