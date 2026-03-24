@@ -5,6 +5,8 @@ import { Sparkles, Plus, Mic } from "lucide-react";
 export default function Dashboard() {
   const [inputValue, setInputValue] = useState("");
   const [selectedModel, setSelectedModel] = useState("Haiku 4.5");
+  const [promptMode, setPromptMode] = useState("prompt_engineering");
+  const [responseLength, setResponseLength] = useState("balanced");
   const [generatedPrompt, setGeneratedPrompt] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -76,6 +78,8 @@ export default function Dashboard() {
         body: JSON.stringify({
           user_input: trimmedInput,
           model: selectedModel,
+          prompt_mode: promptMode,
+          response_length: responseLength,
         }),
       });
 
@@ -173,6 +177,35 @@ export default function Dashboard() {
                 <span className="btn-label">{btn.label}</span>
               </button>
             ))}
+          </div>
+
+          <div className="generation-controls" aria-label="Generation controls">
+            <label className="control-group" htmlFor="mode-selector">
+              <span className="control-label">Mode</span>
+              <select
+                id="mode-selector"
+                className="control-selector"
+                value={promptMode}
+                onChange={(e) => setPromptMode(e.target.value)}
+              >
+                <option value="prompt_engineering">Prompt Engineering</option>
+                <option value="vibe_coding">Vibe Coding</option>
+              </select>
+            </label>
+
+            <label className="control-group" htmlFor="length-selector">
+              <span className="control-label">Length</span>
+              <select
+                id="length-selector"
+                className="control-selector"
+                value={responseLength}
+                onChange={(e) => setResponseLength(e.target.value)}
+              >
+                <option value="short">Short</option>
+                <option value="balanced">Balanced</option>
+                <option value="long">Long</option>
+              </select>
+            </label>
           </div>
 
           {(isLoading || errorMessage || generatedPrompt) && (
