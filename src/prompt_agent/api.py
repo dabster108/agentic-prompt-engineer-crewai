@@ -6,6 +6,7 @@ from typing import Literal
 import uuid
 
 from fastapi import FastAPI
+from fastapi import Header
 from fastapi import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.concurrency import run_in_threadpool
@@ -121,12 +122,54 @@ async def _run_with_rate_limit_retry(crew_instance, inputs: dict[str, str], thre
 
 app = FastAPI(title="PromptForge API", version="0.1.0")
 
+
+def _get_allowed_models() -> set[str]:
+    allowed = os.getenv("PROMPTFORGE_ALLOWED_MODELS", "").strip()
+    if not allowed:
+        return set()
+    return {item.strip() for item in allowed.split(",") if item.strip()}
+
+
+def _validate_model_choice(model_name: str) -> None:
+    allowed = _get_allowed_models()
+    if allowed and model_name not in allowed:
+        raise HTTPException(
+            status_code=400,
+            detail="Requested model is not allowed.",
+        )
+
+
+def _require_api_key(api_key_header: str | None, authorization: str | None) -> None:
+    require_key = os.getenv("PROMPTFORGE_REQUIRE_API_KEY", "false").lower() == "true"
+    if not require_key:
+        return
+
+    configured_key = os.getenv("PROMPTFORGE_API_KEY", "").strip()
+    if not configured_key:
+        raise HTTPException(
+            status_code=500,
+            detail="Server is missing API key configuration.",
+        )
+
+    candidate = ""
+    if authorization:
+        parts = authorization.split(" ", 1)
+        if len(parts) == 2 and parts[0].lower() == "bearer":
+            candidate = parts[1].strip()
+    if not candidate and api_key_header:
+        candidate = api_key_header.strip()
+
+    if not candidate or candidate != configured_key:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+cors_origins = [origin.strip() for origin in os.getenv("PROMPTFORGE_CORS_ORIGINS", "*").split(",") if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=cors_origins,
+    allow_credentials=False,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*"]
 )
 
 
@@ -136,7 +179,14 @@ def health_check() -> dict[str, str]:
 
 
 @app.post("/api/prompt", response_model=PromptResponse)
-async def create_prompt(payload: PromptRequest) -> PromptResponse:
+async def create_prompt(
+    payload: PromptRequest,
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+    authorization: str | None = Header(default=None, alias="Authorization"),
+) -> PromptResponse:
+    _require_api_key(x_api_key, authorization)
+    _validate_model_choice(payload.model)
+
     thread_id = os.getenv("OPIK_THREAD_ID", f"prompt-agent-{uuid.uuid4()}")
     generation_brief = _build_generation_brief(payload)
 
@@ -155,13 +205,11 @@ async def create_prompt(payload: PromptRequest) -> PromptResponse:
         )
         prompt_text = _sanitize_agent_output(_extract_crew_text(crew_result))
     except Exception as error:
-        raise HTTPException(
-            status_code=500,
-            detail=(
-                "Prompt generation failed while executing CrewAI. "
-                f"Details: {error}"
-            ),
-        ) from error
+        debug_enabled = os.getenv("PROMPTFORGE_DEBUG", "false").lower() == "true"
+        detail = "Prompt generation failed while executing CrewAI."
+        if debug_enabled:
+            detail = f"{detail} Details: {error}"
+        raise HTTPException(status_code=500, detail=detail) from error
 
     return PromptResponse(
         prompt=prompt_text,
