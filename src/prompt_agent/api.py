@@ -1,4 +1,6 @@
 import asyncio
+import logging
+import random
 from datetime import datetime, timezone
 import os
 import re
@@ -18,6 +20,9 @@ try:
     from opik.integrations.crewai import track_crewai
 except ImportError:
     track_crewai = None
+
+
+logger = logging.getLogger("promptforge.api")
 
 
 class PromptRequest(BaseModel):
@@ -90,7 +95,11 @@ def _sanitize_agent_output(text: str) -> str:
     return cleaned.strip()
 
 
-async def _kickoff_with_compatibility(crew_instance, inputs: dict[str, str], thread_id: str):
+async def _kickoff_with_compatibility(
+    crew_instance,
+    inputs: dict[str, str],
+    thread_id: str,
+):
     try:
         return await run_in_threadpool(
             crew_instance.kickoff,
@@ -103,24 +112,41 @@ async def _kickoff_with_compatibility(crew_instance, inputs: dict[str, str], thr
         return await run_in_threadpool(crew_instance.kickoff, inputs=inputs)
 
 
-async def _run_with_rate_limit_retry(crew_instance, inputs: dict[str, str], thread_id: str):
-    max_attempts = int(os.getenv("PROMPTFORGE_MAX_RETRIES", "2"))
-    wait_seconds = int(os.getenv("PROMPTFORGE_RETRY_WAIT_SECONDS", "35"))
+def _is_retryable_error(error: Exception) -> bool:
+    error_text = str(error).lower()
+    return "rate limit" in error_text or "rate_limit_exceeded" in error_text
+
+
+def _compute_backoff_seconds(attempt: int) -> float:
+    base_delay = float(os.getenv("PROMPTFORGE_RETRY_BASE_SECONDS", "2"))
+    max_delay = float(os.getenv("PROMPTFORGE_RETRY_MAX_SECONDS", "40"))
+    jitter = float(os.getenv("PROMPTFORGE_RETRY_JITTER_SECONDS", "0.5"))
+    delay = min(max_delay, base_delay * (2 ** (attempt - 1)))
+    return delay + random.uniform(0, jitter)
+
+
+async def _run_with_rate_limit_retry(
+    crew_instance,
+    inputs: dict[str, str],
+    thread_id: str,
+):
+    max_attempts = int(os.getenv("PROMPTFORGE_MAX_RETRIES", "3"))
 
     for attempt in range(1, max_attempts + 1):
         try:
             return await _kickoff_with_compatibility(crew_instance, inputs, thread_id)
         except Exception as error:
-            error_text = str(error).lower()
-            is_rate_limit = "rate limit" in error_text or "rate_limit_exceeded" in error_text
-            if not is_rate_limit or attempt == max_attempts:
+            if not _is_retryable_error(error) or attempt == max_attempts:
                 raise
-            await asyncio.sleep(wait_seconds)
+            await asyncio.sleep(_compute_backoff_seconds(attempt))
 
     raise RuntimeError("CrewAI execution failed after retries")
 
 
 app = FastAPI(title="PromptForge API", version="0.1.0")
+
+max_in_flight = int(os.getenv("PROMPTFORGE_MAX_IN_FLIGHT", "8"))
+_crew_semaphore = asyncio.Semaphore(max_in_flight)
 
 
 def _get_allowed_models() -> set[str]:
@@ -187,24 +213,35 @@ async def create_prompt(
     _require_api_key(x_api_key, authorization)
     _validate_model_choice(payload.model)
 
-    thread_id = os.getenv("OPIK_THREAD_ID", f"prompt-agent-{uuid.uuid4()}")
+    request_id = str(uuid.uuid4())
+    thread_id = os.getenv("OPIK_THREAD_ID", f"prompt-agent-{request_id}")
     generation_brief = _build_generation_brief(payload)
 
     try:
-        crew_instance = _create_tracked_crew()
-        crew_result = await _run_with_rate_limit_retry(
-            crew_instance=crew_instance,
-            inputs={
-                "user_input": payload.user_input.strip(),
-                "model": payload.model,
-                "prompt_mode": payload.prompt_mode,
-                "response_length": payload.response_length,
-                "generation_brief": generation_brief,
-            },
-            thread_id=thread_id,
-        )
-        prompt_text = _sanitize_agent_output(_extract_crew_text(crew_result))
+        async with _crew_semaphore:
+            timeout_seconds = float(os.getenv("PROMPTFORGE_REQUEST_TIMEOUT_SECONDS", "120"))
+            crew_instance = _create_tracked_crew()
+            crew_result = await asyncio.wait_for(
+                _run_with_rate_limit_retry(
+                    crew_instance=crew_instance,
+                    inputs={
+                        "user_input": payload.user_input.strip(),
+                        "model": payload.model,
+                        "prompt_mode": payload.prompt_mode,
+                        "response_length": payload.response_length,
+                        "generation_brief": generation_brief,
+                    },
+                    thread_id=thread_id,
+                ),
+                timeout=timeout_seconds,
+            )
+            prompt_text = _sanitize_agent_output(_extract_crew_text(crew_result))
+            logger.info("prompt_generated", extra={"request_id": request_id})
+    except asyncio.TimeoutError as error:
+        logger.warning("prompt_timeout", extra={"request_id": request_id})
+        raise HTTPException(status_code=504, detail="Prompt generation timed out.") from error
     except Exception as error:
+        logger.exception("prompt_failure", extra={"request_id": request_id})
         debug_enabled = os.getenv("PROMPTFORGE_DEBUG", "false").lower() == "true"
         detail = "Prompt generation failed while executing CrewAI."
         if debug_enabled:
