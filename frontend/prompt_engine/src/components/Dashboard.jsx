@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import "../styles/Dashboard.css";
-import { Sparkles, Plus, Mic } from "lucide-react";
+import { Plus, Mic } from "lucide-react";
 
 export default function Dashboard() {
   const [inputValue, setInputValue] = useState("");
@@ -25,6 +25,46 @@ export default function Dashboard() {
     { label: "Code" },
     { label: "Life stuff" },
     { label: "Claude's choice" },
+  ];
+
+  const navLinks = ["Product", "Agents", "Tech Stack", "Docs"];
+
+  const agentFlowCards = [
+    {
+      title: "Intent Capture",
+      text: "Understands your goal, constraints, and target output before generating anything.",
+    },
+    {
+      title: "Agent Plan",
+      text: "Creates an execution plan across prompt strategy, role setup, and context shaping.",
+    },
+    {
+      title: "Precision Output",
+      text: "Delivers clean prompts optimized for coding, writing, learning, and system design.",
+    },
+  ];
+
+  const techStackCards = [
+    {
+      title: "Fast Frontend",
+      text: "React + Vite interface with smooth transitions and low latency interactions.",
+      tag: "UI",
+    },
+    {
+      title: "Prompt Engine Core",
+      text: "Python backend orchestrating model selection, response length, and mode controls.",
+      tag: "Core",
+    },
+    {
+      title: "Agent Modules",
+      text: "Task-specific agents for prompt engineering, vibe coding, and workflow automation.",
+      tag: "Agents",
+    },
+    {
+      title: "Context Layer",
+      text: "Memory-aware context that keeps user preferences and task intent consistent.",
+      tag: "State",
+    },
   ];
 
   const handleInputFocus = (e) => {
@@ -106,24 +146,32 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard-container">
-      {/* Soft gradient background */}
-      <div className="background-gradient"></div>
-
       <div className="dashboard-content">
-        {/* Main Content Section */}
-        <div className="main-section">
-          {/* Greeting */}
+        <header className="top-nav" aria-label="Main navigation">
+          <div className="brand-mark">PromptForge</div>
+
+          <nav className="nav-links" aria-label="Primary">
+            {navLinks.map((link) => (
+              <a key={link} href="#" className="nav-link">
+                {link}
+              </a>
+            ))}
+          </nav>
+
+          <button type="button" className="nav-cta">
+            Start free
+          </button>
+        </header>
+
+        <section className="main-section" id="hero">
           <div className="greeting-section">
-            <h1 className="greeting-text">
-              <span className="greeting-icon" aria-hidden="true">
-                <Sparkles size={24} />
-              </span>
-              Afternoon, Dikshanta
-            </h1>
-            <p className="context-highlight">Turn your context into prompt</p>
+            <h1 className="greeting-text">Build smarter prompts</h1>
+            <p className="hero-subtext">
+              Transform rough ideas into structured prompts with a focused AI
+              workspace built for speed and clarity.
+            </p>
           </div>
 
-          {/* Input Box */}
           <div className="input-wrapper">
             <div className="input-container">
               <button
@@ -165,7 +213,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Action Buttons */}
           <div className="action-buttons">
             {actionButtons.map((btn) => (
               <button
@@ -269,13 +316,58 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Footer hint */}
           <div className="footer-hint">
             <p>
               Press <kbd>/</kbd> to see available commands
             </p>
           </div>
-        </div>
+        </section>
+
+        <section className="feature-sections" aria-label="Product capabilities">
+          <div className="section-heading-wrap" id="agents">
+            <p className="section-kicker">How Agents Work</p>
+            <h2 className="section-heading">
+              From idea to production-ready prompt
+            </h2>
+          </div>
+
+          <div className="system-flow" aria-label="Agent flow cards">
+            {agentFlowCards.map((card, index) => (
+              <article
+                key={card.title}
+                className="system-card"
+                style={{ animationDelay: `${160 + index * 120}ms` }}
+              >
+                <span className="system-step">0{index + 1}</span>
+                <div>
+                  <h3 className="system-title">{card.title}</h3>
+                  <p className="system-text">{card.text}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <div className="section-heading-wrap system-heading" id="stack">
+            <p className="section-kicker">Tech Stack</p>
+            <h2 className="section-heading">
+              Built for speed, precision, and scale
+            </h2>
+          </div>
+
+          <div className="flashcard-grid">
+            {techStackCards.map((card, index) => (
+              <article
+                key={card.title}
+                className="flashcard"
+                style={{ animationDelay: `${260 + index * 90}ms` }}
+              >
+                <span className="flashcard-tag">{card.tag}</span>
+                <h3 className="flashcard-title">{card.title}</h3>
+                <p className="flashcard-text">{card.text}</p>
+              </article>
+            ))}
+          </div>
+        </section>
       </div>
     </div>
   );
