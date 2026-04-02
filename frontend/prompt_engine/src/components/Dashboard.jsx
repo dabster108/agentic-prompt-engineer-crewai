@@ -4,7 +4,9 @@ import { Plus, Mic } from "lucide-react";
 
 export default function Dashboard() {
   const [inputValue, setInputValue] = useState("");
-  const [selectedModel, setSelectedModel] = useState("Haiku 4.5");
+  const [selectedModel, setSelectedModel] = useState(
+    "groq/llama-3.3-70b-versatile",
+  );
   const [promptMode, setPromptMode] = useState("prompt_engineering");
   const [responseLength, setResponseLength] = useState("balanced");
   const [generatedPrompt, setGeneratedPrompt] = useState("");
@@ -198,7 +200,9 @@ export default function Dashboard() {
                   value={selectedModel}
                   onChange={(e) => setSelectedModel(e.target.value)}
                 >
-                  <option>Haiku 4.5</option>
+                  <option value="groq/llama-3.3-70b-versatile">
+                    Llama 3.3 70B Versatile
+                  </option>
                   <option>Sonnet 4.5</option>
                   <option>Opus 4.1</option>
                 </select>

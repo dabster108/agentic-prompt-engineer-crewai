@@ -13,7 +13,8 @@ except ImportError:
 
 def _create_tracked_crew():
     crew_instance = PromptAgent().crew()
-    if track_crewai is not None:
+    disable_opik = os.getenv("PROMPTFORGE_DISABLE_OPIK", "false").lower() == "true"
+    if track_crewai is not None and not disable_opik:
         project_name = os.getenv("OPIK_PROJECT_NAME", "PromptForge")
         try:
             track_crewai(project_name=project_name, crew=crew_instance)
@@ -34,8 +35,31 @@ def _read_user_input() -> str:
     return user_input
 
 
+def _get_generation_controls() -> tuple[str, str, str]:
+    model = os.getenv("PROMPTFORGE_MODEL", os.getenv("PROMPTFORGE_LLM_MODEL", "groq/llama-3.3-70b-versatile")).strip()
+    prompt_mode = os.getenv("PROMPTFORGE_PROMPT_MODE", "prompt_engineering").strip()
+    response_length = os.getenv("PROMPTFORGE_RESPONSE_LENGTH", "balanced").strip()
+    return model, prompt_mode, response_length
+
+
+def _build_generation_brief(user_input: str, model: str, prompt_mode: str, response_length: str) -> str:
+    return (
+        "user_request:\n"
+        f"{user_input.strip()}\n\n"
+        "generation_preferences:\n"
+        f"model: {model}\n"
+        f"prompt_mode: {prompt_mode}\n"
+        f"response_length: {response_length}\n\n"
+        "delivery_expectation:\n"
+        "Return one final copy-ready prompt package that follows the selected mode "
+        "and requested response length. Keep language natural, direct, and practical."
+    )
+
+
 def _kickoff_with_compatibility(crew_instance, inputs, thread_id):
     try:
+        if os.getenv("PROMPTFORGE_DISABLE_OPIK", "false").lower() == "true":
+            return crew_instance.kickoff(inputs=inputs)
         return crew_instance.kickoff(
             inputs=inputs,
             opik_args={"trace": {"thread_id": thread_id}},
@@ -88,10 +112,17 @@ def run():
     """
     crew_instance = _create_tracked_crew()
     user_input = _read_user_input()
+    model, prompt_mode, response_length = _get_generation_controls()
     thread_id = os.getenv("OPIK_THREAD_ID", f"prompt-agent-{uuid.uuid4()}")
     result = _run_with_rate_limit_retry(
         crew_instance=crew_instance,
-        inputs={"user_input": user_input},
+        inputs={
+            "user_input": user_input,
+            "model": model,
+            "prompt_mode": prompt_mode,
+            "response_length": response_length,
+            "generation_brief": _build_generation_brief(user_input, model, prompt_mode, response_length),
+        },
         thread_id=thread_id,
     )
     print("\nFINAL RESULT:\n")
