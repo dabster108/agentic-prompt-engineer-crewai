@@ -15,8 +15,12 @@ class PromptAgent:
 
     def __init__(self):
         self.verbose = os.getenv("PROMPTFORGE_VERBOSE", "false").lower() == "true"
+        model_name = os.getenv(
+            "PROMPTFORGE_LLM_MODEL",
+            os.getenv("PROMPTFORGE_MODEL", os.getenv("MODEL", "groq/llama-3.3-70b-versatile")),
+        )
         self.groq_llm = LLM(
-            model=os.getenv("PROMPTFORGE_LLM_MODEL", "groq/llama-3.1-8b-instant"),
+            model=model_name,
             api_key=os.getenv("GROQ_API_KEY"),
             max_tokens=int(os.getenv("PROMPTFORGE_MAX_TOKENS", "900")),
         )

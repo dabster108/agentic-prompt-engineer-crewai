@@ -27,7 +27,7 @@ logger = logging.getLogger("promptforge.api")
 
 class PromptRequest(BaseModel):
     user_input: str = Field(min_length=1, max_length=2000)
-    model: str = Field(default="Haiku 4.5", min_length=1, max_length=100)
+    model: str = Field(default="groq/llama-3.3-70b-versatile", min_length=1, max_length=100)
     prompt_mode: Literal["prompt_engineering", "vibe_coding"] = "prompt_engineering"
     response_length: Literal["short", "balanced", "long"] = "balanced"
 
@@ -58,7 +58,8 @@ def _build_generation_brief(payload: PromptRequest) -> str:
 
 def _create_tracked_crew():
     crew_instance = PromptAgent().crew()
-    if track_crewai is not None:
+    disable_opik = os.getenv("PROMPTFORGE_DISABLE_OPIK", "false").lower() == "true"
+    if track_crewai is not None and not disable_opik:
         project_name = os.getenv("OPIK_PROJECT_NAME", "PromptForge")
         try:
             track_crewai(project_name=project_name, crew=crew_instance)
@@ -101,6 +102,8 @@ async def _kickoff_with_compatibility(
     thread_id: str,
 ):
     try:
+        if os.getenv("PROMPTFORGE_DISABLE_OPIK", "false").lower() == "true":
+            return await run_in_threadpool(crew_instance.kickoff, inputs=inputs)
         return await run_in_threadpool(
             crew_instance.kickoff,
             inputs=inputs,
