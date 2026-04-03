@@ -1,11 +1,14 @@
 from pathlib import Path
 import os
 
-import matplotlib.pyplot as plt
+from graphviz import Digraph
+
+from graphviz_utils import render_png
 
 
 def main() -> None:
-    out_dir = Path("artifacts")
+    project_root = Path(__file__).resolve().parents[2]
+    out_dir = project_root / "artifacts"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     model = os.getenv(
@@ -17,40 +20,36 @@ def main() -> None:
     response_length = os.getenv("PROMPTFORGE_RESPONSE_LENGTH", "short")
     opik_disabled = os.getenv("PROMPTFORGE_DISABLE_OPIK", "true")
 
-    fig, ax = plt.subplots(figsize=(11, 6))
-    ax.axis("off")
-    ax.set_title("PromptForge Model Runtime", fontsize=18, weight="bold", pad=16)
-
-    rows = [
-        ("Provider", "Groq"),
-        ("Model", model),
-        ("Max Tokens", str(max_tokens)),
-        ("Fast Mode", str(fast_mode)),
-        ("Response Length", response_length),
-        ("OPIK Disabled", opik_disabled),
-    ]
-
-    table = ax.table(
-        cellText=[[k, v] for k, v in rows],
-        colLabels=["Setting", "Value"],
-        colWidths=[0.35, 0.65],
-        loc="center",
-        cellLoc="left",
+    diagram = Digraph("promptforge_model_runtime", engine="dot")
+    diagram.attr(
+        rankdir="TB",
+        splines="ortho",
+        bgcolor="white",
+        label="PromptForge Model Runtime Decision Flow",
+        labelloc="t",
+        fontsize="14",
     )
-    table.auto_set_font_size(False)
-    table.set_fontsize(12)
-    table.scale(1, 2)
+    diagram.attr("node", fontname="Helvetica", fontsize="10", style="rounded,filled", color="#0b3d91")
 
-    for (r, _c), cell in table.get_celld().items():
-        if r == 0:
-            cell.set_facecolor("#0b3d91")
-            cell.set_text_props(color="white", weight="bold")
-        else:
-            cell.set_facecolor("#f3f6fc" if r % 2 == 0 else "#ffffff")
+    diagram.node("env", "Load Environment Variables", shape="box", fillcolor="#e8f0fe")
+    diagram.node("provider", "Provider: Groq", shape="box", fillcolor="#f3f7ff")
+    diagram.node("model", f"Model: {model}", shape="box", fillcolor="#f3f7ff")
+    diagram.node("tokens", f"Max Tokens: {max_tokens}", shape="box", fillcolor="#f3f7ff")
+    diagram.node("fast_mode", f"Fast Mode Enabled?\n{fast_mode}", shape="diamond", fillcolor="#fff1cc")
+    diagram.node("response", f"Response Length: {response_length}", shape="box", fillcolor="#f3f7ff")
+    diagram.node("opik", f"OPIK Disabled: {opik_disabled}", shape="box", fillcolor="#f3f7ff")
+    diagram.node("runtime", "Runtime Ready", shape="parallelogram", fillcolor="#e8f0fe")
 
-    plt.tight_layout()
-    plt.savefig(out_dir / "model.png", dpi=200)
-    plt.close()
+    diagram.edge("env", "provider")
+    diagram.edge("provider", "model")
+    diagram.edge("model", "tokens")
+    diagram.edge("tokens", "fast_mode")
+    diagram.edge("fast_mode", "response", label="Yes")
+    diagram.edge("fast_mode", "response", label="No")
+    diagram.edge("response", "opik")
+    diagram.edge("opik", "runtime")
+
+    render_png(diagram, out_dir / "model.png")
 
 
 if __name__ == "__main__":

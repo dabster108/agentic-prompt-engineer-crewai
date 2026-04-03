@@ -9,7 +9,7 @@ def run_script(script_path: Path) -> None:
 
 
 def main() -> None:
-    base = Path("artifacts/visualis")
+    base = Path(__file__).resolve().parent
     run_script(base / "model_png.py")
     run_script(base / "agents_png.py")
     run_script(base / "architecture_png.py")

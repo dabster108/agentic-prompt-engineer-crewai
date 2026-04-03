@@ -1,0 +1,21 @@
+digraph promptforge_model_runtime {
+	bgcolor=white fontsize=14 label="PromptForge Model Runtime Decision Flow" labelloc=t rankdir=TB splines=ortho
+	node [color="#0b3d91" fontname=Helvetica fontsize=10 style="rounded,filled"]
+	env [label="Load Environment Variables" fillcolor="#e8f0fe" shape=box]
+	provider [label="Provider: Groq" fillcolor="#f3f7ff" shape=box]
+	model [label="Model: groq/llama-3.3-70b-versatile" fillcolor="#f3f7ff" shape=box]
+	tokens [label="Max Tokens: 512" fillcolor="#f3f7ff" shape=box]
+	fast_mode [label="Fast Mode Enabled?
+True" fillcolor="#fff1cc" shape=diamond]
+	response [label="Response Length: short" fillcolor="#f3f7ff" shape=box]
+	opik [label="OPIK Disabled: true" fillcolor="#f3f7ff" shape=box]
+	runtime [label="Runtime Ready" fillcolor="#e8f0fe" shape=parallelogram]
+	env -> provider
+	provider -> model
+	model -> tokens
+	tokens -> fast_mode
+	fast_mode -> response [label=Yes]
+	fast_mode -> response [label=No]
+	response -> opik
+	opik -> runtime
+}

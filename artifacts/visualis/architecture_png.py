@@ -1,8 +1,10 @@
 from pathlib import Path
 import os
 
-import matplotlib.pyplot as plt
+from graphviz import Digraph
 import yaml
+
+from graphviz_utils import render_png
 
 
 def active_tasks(tasks_dict: dict, fast_mode: bool) -> list[str]:
@@ -20,15 +22,10 @@ def active_tasks(tasks_dict: dict, fast_mode: bool) -> list[str]:
     return [task for task in sequence if task in tasks_dict]
 
 
-def draw_box(ax, x: float, y: float, w: float, h: float, text: str, fc: str = "#e8f0fe", ec: str = "#1f4b99") -> None:
-    rect = plt.Rectangle((x, y), w, h, facecolor=fc, edgecolor=ec, linewidth=1.5)
-    ax.add_patch(rect)
-    ax.text(x + w / 2, y + h / 2, text, ha="center", va="center", fontsize=10, wrap=True)
-
-
 def main() -> None:
-    tasks_path = Path("src/prompt_agent/config/tasks.yaml")
-    out_dir = Path("artifacts")
+    project_root = Path(__file__).resolve().parents[2]
+    tasks_path = project_root / "src/prompt_agent/config/tasks.yaml"
+    out_dir = project_root / "artifacts"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     with tasks_path.open("r", encoding="utf-8") as f:
@@ -41,44 +38,52 @@ def main() -> None:
     )
     process = os.getenv("PROMPTFORGE_PROCESS", "sequential")
 
-    sequence = active_tasks(tasks, fast_mode)
+    diagram = Digraph("promptforge_architecture", engine="dot")
+    diagram.attr(
+        rankdir="LR",
+        splines="ortho",
+        bgcolor="white",
+        nodesep="0.6",
+        ranksep="0.9",
+        label=f"PromptForge Architecture | process={process} | fast_mode={fast_mode} | model={model}",
+        labelloc="t",
+        fontsize="14",
+    )
+    diagram.attr("node", fontname="Helvetica", fontsize="10", style="rounded,filled", color="#1f4b99")
 
-    fig, ax = plt.subplots(figsize=(15, 6))
-    ax.set_xlim(0, max(10, len(sequence) * 2.2 + 3))
-    ax.set_ylim(0, 6)
-    ax.axis("off")
-    ax.set_title(f"PromptForge Architecture ({process}, fast_mode={fast_mode})", fontsize=16, weight="bold", pad=14)
+    diagram.node("input", "User Input", shape="parallelogram", fillcolor="#e8f0fe")
+    diagram.node("decision", "Fast Mode?", shape="diamond", fillcolor="#fff1cc")
+    diagram.node("output", "Final Prompt", shape="parallelogram", fillcolor="#e8f0fe")
 
-    x = 0.8
-    y = 2.2
-    w = 1.8
-    h = 1.4
+    diagram.edge("input", "decision")
 
-    draw_box(ax, 0.2, y, 1.2, h, "Input")
-    ax.annotate("", xy=(x, y + h / 2), xytext=(1.4, y + h / 2), arrowprops=dict(arrowstyle="->", lw=1.5))
+    with diagram.subgraph(name="cluster_fast") as fast_cluster:
+        fast_cluster.attr(label="Fast Path", color="#8cb3ff", style="rounded")
+        for task_name in active_tasks(tasks, True):
+            agent = tasks.get(task_name, {}).get("agent", "n/a")
+            fast_cluster.node(task_name, f"{task_name}\nagent: {agent}", shape="box", fillcolor="#f3f7ff")
 
-    for idx, task_name in enumerate(sequence):
-        agent = tasks.get(task_name, {}).get("agent", "n/a")
-        label = f"{task_name}\n({agent})"
-        draw_box(ax, x, y, w, h, label)
-        if idx < len(sequence) - 1:
-            ax.annotate(
-                "",
-                xy=(x + w + 0.3, y + h / 2),
-                xytext=(x + w, y + h / 2),
-                arrowprops=dict(arrowstyle="->", lw=1.5),
-            )
-        x += 2.2
+    with diagram.subgraph(name="cluster_full") as full_cluster:
+        full_cluster.attr(label="Full Quality Path", color="#6aa84f", style="rounded")
+        for task_name in active_tasks(tasks, False):
+            agent = tasks.get(task_name, {}).get("agent", "n/a")
+            full_cluster.node(f"full_{task_name}", f"{task_name}\nagent: {agent}", shape="box", fillcolor="#f3fff2")
 
-    draw_box(ax, x, y, 1.4, h, "Output")
-    ax.annotate("", xy=(x, y + h / 2), xytext=(x - 0.3, y + h / 2), arrowprops=dict(arrowstyle="->", lw=1.5))
+    fast_sequence = active_tasks(tasks, True)
+    full_sequence = active_tasks(tasks, False)
 
-    ax.text(0.2, 0.5, f"LLM Model: {model}", fontsize=11)
-    ax.text(0.2, 0.15, "Source: crew.py and tasks.yaml runtime sequence", fontsize=9, color="#4b4b4b")
+    diagram.edge("decision", fast_sequence[0], label="Yes", color="#1f4b99")
+    diagram.edge("decision", f"full_{full_sequence[0]}", label="No", color="#2d6a1f")
 
-    plt.tight_layout()
-    plt.savefig(out_dir / "architecture.png", dpi=220)
-    plt.close()
+    for idx in range(len(fast_sequence) - 1):
+        diagram.edge(fast_sequence[idx], fast_sequence[idx + 1], color="#1f4b99")
+    diagram.edge(fast_sequence[-1], "output", color="#1f4b99")
+
+    for idx in range(len(full_sequence) - 1):
+        diagram.edge(f"full_{full_sequence[idx]}", f"full_{full_sequence[idx + 1]}", color="#2d6a1f")
+    diagram.edge(f"full_{full_sequence[-1]}", "output", color="#2d6a1f")
+
+    render_png(diagram, out_dir / "architecture.png")
 
 
 if __name__ == "__main__":
