@@ -17,11 +17,6 @@ from pydantic import BaseModel, Field
 
 from .crew import PromptAgent
 
-try:
-    from opik.integrations.crewai import track_crewai
-except ImportError:
-    track_crewai = None
-
 
 logger = logging.getLogger("promptforge.api")
 
@@ -62,15 +57,7 @@ def _build_generation_brief(payload: PromptRequest, regeneration_context: str = 
 
 
 def _create_tracked_crew():
-    crew_instance = PromptAgent().crew()
-    disable_opik = os.getenv("PROMPTFORGE_DISABLE_OPIK", "false").lower() == "true"
-    if track_crewai is not None and not disable_opik:
-        project_name = os.getenv("OPIK_PROJECT_NAME", "PromptForge")
-        try:
-            track_crewai(project_name=project_name, crew=crew_instance)
-        except TypeError:
-            track_crewai(project_name=project_name)
-    return crew_instance
+    return PromptAgent().crew()
 
 
 def _extract_crew_text(result: object) -> str:
@@ -186,20 +173,8 @@ def _extract_prompt_and_metadata(raw_text: str) -> tuple[str, dict[str, Any] | N
 async def _kickoff_with_compatibility(
     crew_instance,
     inputs: dict[str, str],
-    thread_id: str,
 ):
-    try:
-        if os.getenv("PROMPTFORGE_DISABLE_OPIK", "false").lower() == "true":
-            return await run_in_threadpool(crew_instance.kickoff, inputs=inputs)
-        return await run_in_threadpool(
-            crew_instance.kickoff,
-            inputs=inputs,
-            opik_args={"trace": {"thread_id": thread_id}},
-        )
-    except TypeError as error:
-        if "opik_args" not in str(error):
-            raise
-        return await run_in_threadpool(crew_instance.kickoff, inputs=inputs)
+    return await run_in_threadpool(crew_instance.kickoff, inputs=inputs)
 
 
 def _is_retryable_error(error: Exception) -> bool:
@@ -218,13 +193,12 @@ def _compute_backoff_seconds(attempt: int) -> float:
 async def _run_with_rate_limit_retry(
     crew_instance,
     inputs: dict[str, str],
-    thread_id: str,
 ):
     max_attempts = int(os.getenv("PROMPTFORGE_MAX_RETRIES", "3"))
 
     for attempt in range(1, max_attempts + 1):
         try:
-            return await _kickoff_with_compatibility(crew_instance, inputs, thread_id)
+            return await _kickoff_with_compatibility(crew_instance, inputs)
         except Exception as error:
             if not _is_retryable_error(error) or attempt == max_attempts:
                 raise
@@ -304,7 +278,6 @@ async def create_prompt(
     _validate_model_choice(payload.model)
 
     request_id = str(uuid.uuid4())
-    thread_id = os.getenv("OPIK_THREAD_ID", f"prompt-agent-{request_id}")
     generation_brief = _build_generation_brief(payload)
     min_score = int(os.getenv("PROMPTFORGE_MIN_SCORE", "80"))
     max_regen = int(os.getenv("PROMPTFORGE_REGEN_MAX_ATTEMPTS", "1"))
@@ -331,7 +304,6 @@ async def create_prompt(
                             "regeneration_context": regeneration_context,
                             "regeneration_attempt": str(attempt),
                         },
-                        thread_id=thread_id,
                     ),
                     timeout=timeout_seconds,
                 )

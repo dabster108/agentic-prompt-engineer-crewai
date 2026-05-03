@@ -1,28 +1,14 @@
 import sys
 import os
 import re
-import uuid
 import time
 import json
 from typing import Any
 from .crew import PromptAgent
 
-try:
-    from opik.integrations.crewai import track_crewai
-except ImportError:
-    track_crewai = None
-
 
 def _create_tracked_crew():
-    crew_instance = PromptAgent().crew()
-    disable_opik = os.getenv("PROMPTFORGE_DISABLE_OPIK", "false").lower() == "true"
-    if track_crewai is not None and not disable_opik:
-        project_name = os.getenv("OPIK_PROJECT_NAME", "PromptForge")
-        try:
-            track_crewai(project_name=project_name, crew=crew_instance)
-        except TypeError:
-            track_crewai(project_name=project_name)
-    return crew_instance
+    return PromptAgent().crew()
 
 
 def _read_user_input() -> str:
@@ -38,7 +24,7 @@ def _read_user_input() -> str:
 
 
 def _get_generation_controls() -> tuple[str, str, str]:
-    model = os.getenv("PROMPTFORGE_MODEL", os.getenv("PROMPTFORGE_LLM_MODEL", "groq/llama-3.3-70b-versatile")).strip()
+    model = os.getenv("PROMPTFORGE_MODEL", "groq/llama-3.3-70b-versatile").strip()
     prompt_mode = os.getenv("PROMPTFORGE_PROMPT_MODE", "prompt_engineering").strip()
     response_length = os.getenv("PROMPTFORGE_RESPONSE_LENGTH", "balanced").strip()
     return model, prompt_mode, response_length
@@ -67,27 +53,17 @@ def _build_generation_brief(
     return brief
 
 
-def _kickoff_with_compatibility(crew_instance, inputs, thread_id):
-    try:
-        if os.getenv("PROMPTFORGE_DISABLE_OPIK", "false").lower() == "true":
-            return crew_instance.kickoff(inputs=inputs)
-        return crew_instance.kickoff(
-            inputs=inputs,
-            opik_args={"trace": {"thread_id": thread_id}},
-        )
-    except TypeError as error:
-        if "opik_args" not in str(error):
-            raise
-        return crew_instance.kickoff(inputs=inputs)
+def _kickoff_with_compatibility(crew_instance, inputs):
+    return crew_instance.kickoff(inputs=inputs)
 
 
-def _run_with_rate_limit_retry(crew_instance, inputs, thread_id):
+def _run_with_rate_limit_retry(crew_instance, inputs):
     max_attempts = int(os.getenv("PROMPTFORGE_MAX_RETRIES", "2"))
     wait_seconds = int(os.getenv("PROMPTFORGE_RETRY_WAIT_SECONDS", "35"))
 
     for attempt in range(1, max_attempts + 1):
         try:
-            return _kickoff_with_compatibility(crew_instance, inputs, thread_id)
+            return _kickoff_with_compatibility(crew_instance, inputs)
         except Exception as error:
             error_text = str(error).lower()
             is_rate_limit = "rate limit" in error_text or "rate_limit_exceeded" in error_text
@@ -206,7 +182,6 @@ def run():
     crew_instance = _create_tracked_crew()
     user_input = _read_user_input()
     model, prompt_mode, response_length = _get_generation_controls()
-    thread_id = os.getenv("OPIK_THREAD_ID", f"prompt-agent-{uuid.uuid4()}")
     min_score = int(os.getenv("PROMPTFORGE_MIN_SCORE", "80"))
     max_regen = int(os.getenv("PROMPTFORGE_REGEN_MAX_ATTEMPTS", "1"))
     regeneration_context = ""
@@ -230,7 +205,6 @@ def run():
         result = _run_with_rate_limit_retry(
             crew_instance=crew_instance,
             inputs=inputs,
-            thread_id=thread_id,
         )
         raw_text = _extract_crew_text(result)
         prompt_text, _, validation_report = _extract_prompt_and_metadata(raw_text)
