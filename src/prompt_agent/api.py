@@ -4,7 +4,8 @@ import random
 from datetime import datetime, timezone
 import os
 import re
-from typing import Literal
+import json
+from typing import Any, Literal
 import uuid
 
 from fastapi import FastAPI
@@ -39,11 +40,12 @@ class PromptResponse(BaseModel):
     prompt_mode: str
     response_length: str
     generated_at: str
+    metadata: dict[str, Any] | None = None
 
 
-def _build_generation_brief(payload: PromptRequest) -> str:
+def _build_generation_brief(payload: PromptRequest, regeneration_context: str = "") -> str:
     """Build a structured, model-friendly brief to improve reliability and control."""
-    return (
+    brief = (
         "user_request:\n"
         f"{payload.user_input.strip()}\n\n"
         "generation_preferences:\n"
@@ -54,6 +56,9 @@ def _build_generation_brief(payload: PromptRequest) -> str:
         "Return one final copy-ready prompt package that follows the selected mode "
         "and requested response length. Keep language natural, direct, and practical."
     )
+    if regeneration_context:
+        brief = f"{brief}\n\nregeneration_context:\n{regeneration_context.strip()}"
+    return brief
 
 
 def _create_tracked_crew():
@@ -94,6 +99,88 @@ def _sanitize_agent_output(text: str) -> str:
     # Collapse excessive blank lines to keep the response flow compact.
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     return cleaned.strip()
+
+
+def _try_parse_json(text: str) -> dict[str, Any] | None:
+    decoder = json.JSONDecoder()
+    for index, char in enumerate(text):
+        if char != "{":
+            continue
+        try:
+            payload, _ = decoder.raw_decode(text[index:])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, dict):
+            return payload
+    return None
+
+
+def _find_prompt_text(payload: Any) -> str | None:
+    if isinstance(payload, dict):
+        for key in ("final_prompt_lines", "optimized_prompt_lines", "prompt_lines"):
+            value = payload.get(key)
+            if isinstance(value, list) and all(isinstance(item, str) for item in value):
+                return "\n".join(value).strip()
+        for key in ("final_prompt", "optimized_prompt", "prompt"):
+            value = payload.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        for value in payload.values():
+            nested = _find_prompt_text(value)
+            if nested:
+                return nested
+    elif isinstance(payload, list):
+        for value in payload:
+            nested = _find_prompt_text(value)
+            if nested:
+                return nested
+    return None
+
+
+def _find_validation_report(payload: Any) -> dict[str, Any] | None:
+    if isinstance(payload, dict):
+        if payload.get("artifact") == "validation_report":
+            data = payload.get("data")
+            return data if isinstance(data, dict) else payload
+        if "overall_score" in payload or "final_status" in payload:
+            return payload
+        for value in payload.values():
+            nested = _find_validation_report(value)
+            if nested:
+                return nested
+    elif isinstance(payload, list):
+        for value in payload:
+            nested = _find_validation_report(value)
+            if nested:
+                return nested
+    return None
+
+
+def _should_regenerate(report: dict[str, Any] | None, min_score: int) -> bool:
+    if not report:
+        return False
+    status = str(report.get("final_status", "")).strip().lower()
+    if status and status != "approved":
+        return True
+    score = report.get("overall_score")
+    if isinstance(score, (int, float)) and score < min_score:
+        return True
+    return False
+
+
+def _format_regeneration_context(report: dict[str, Any] | None) -> str:
+    if not report:
+        return ""
+    return json.dumps(report, ensure_ascii=True)
+
+
+def _extract_prompt_and_metadata(raw_text: str) -> tuple[str, dict[str, Any] | None, dict[str, Any] | None]:
+    payload = _try_parse_json(raw_text)
+    if payload:
+        prompt_text = _find_prompt_text(payload)
+        if prompt_text:
+            return prompt_text, payload, _find_validation_report(payload)
+    return _sanitize_agent_output(raw_text), payload, _find_validation_report(payload) if payload else None
 
 
 async def _kickoff_with_compatibility(
@@ -219,26 +306,43 @@ async def create_prompt(
     request_id = str(uuid.uuid4())
     thread_id = os.getenv("OPIK_THREAD_ID", f"prompt-agent-{request_id}")
     generation_brief = _build_generation_brief(payload)
+    min_score = int(os.getenv("PROMPTFORGE_MIN_SCORE", "80"))
+    max_regen = int(os.getenv("PROMPTFORGE_REGEN_MAX_ATTEMPTS", "1"))
+    regeneration_context = ""
+    validation_report = None
+    prompt_text = ""
+    raw_payload = None
 
     try:
         async with _crew_semaphore:
             timeout_seconds = float(os.getenv("PROMPTFORGE_REQUEST_TIMEOUT_SECONDS", "120"))
-            crew_instance = _create_tracked_crew()
-            crew_result = await asyncio.wait_for(
-                _run_with_rate_limit_retry(
-                    crew_instance=crew_instance,
-                    inputs={
-                        "user_input": payload.user_input.strip(),
-                        "model": payload.model,
-                        "prompt_mode": payload.prompt_mode,
-                        "response_length": payload.response_length,
-                        "generation_brief": generation_brief,
-                    },
-                    thread_id=thread_id,
-                ),
-                timeout=timeout_seconds,
-            )
-            prompt_text = _sanitize_agent_output(_extract_crew_text(crew_result))
+            for attempt in range(max_regen + 1):
+                crew_instance = _create_tracked_crew()
+                generation_brief = _build_generation_brief(payload, regeneration_context)
+                crew_result = await asyncio.wait_for(
+                    _run_with_rate_limit_retry(
+                        crew_instance=crew_instance,
+                        inputs={
+                            "user_input": payload.user_input.strip(),
+                            "model": payload.model,
+                            "prompt_mode": payload.prompt_mode,
+                            "response_length": payload.response_length,
+                            "generation_brief": generation_brief,
+                            "regeneration_context": regeneration_context,
+                            "regeneration_attempt": str(attempt),
+                        },
+                        thread_id=thread_id,
+                    ),
+                    timeout=timeout_seconds,
+                )
+                raw_text = _extract_crew_text(crew_result)
+                prompt_text, raw_payload, validation_report = _extract_prompt_and_metadata(raw_text)
+
+                if attempt == max_regen or not _should_regenerate(validation_report, min_score):
+                    break
+
+                regeneration_context = _format_regeneration_context(validation_report)
+
             logger.info("prompt_generated", extra={"request_id": request_id})
     except asyncio.TimeoutError as error:
         logger.warning("prompt_timeout", extra={"request_id": request_id})
@@ -251,6 +355,11 @@ async def create_prompt(
             detail = f"{detail} Details: {error}"
         raise HTTPException(status_code=500, detail=detail) from error
 
+    include_metadata = os.getenv("PROMPTFORGE_INCLUDE_METADATA", "false").lower() == "true"
+    metadata = validation_report if include_metadata else None
+    if include_metadata and not metadata and raw_payload:
+        metadata = raw_payload
+
     return PromptResponse(
         prompt=prompt_text,
         style="crew",
@@ -258,4 +367,5 @@ async def create_prompt(
         prompt_mode=payload.prompt_mode,
         response_length=payload.response_length,
         generated_at=datetime.now(timezone.utc).isoformat(),
+        metadata=metadata,
     )
